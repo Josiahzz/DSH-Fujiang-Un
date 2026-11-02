@@ -8,13 +8,14 @@ using System.IO.Compression;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Web.Script.Serialization;
 using System.Collections;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-[assembly: System.Reflection.AssemblyVersion("1.2.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.2.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.1.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.2.1.0")]
 [assembly: System.Reflection.AssemblyProduct("DSH Fujiang Unrestricted")]
 
 namespace DSHFujiangInstaller
@@ -686,13 +687,14 @@ namespace DSHFujiangInstaller
             WriteJson(profilePackage, mutable);
 
             Console.WriteLine("STEP disable duplicate fujiang");
-            var patchText = File.ReadAllText(profilePatch);
-            if (patchText.Trim() == "[]") patchText = string.Empty;
+            var originalPatch = File.ReadAllText(profilePatch);
+            var patchText = NormalizeEmptyOverlayRoot(originalPatch);
             if (!patchText.Contains("- id: fujiang"))
             {
                 patchText = patchText.TrimEnd() + Environment.NewLine + Environment.NewLine + "- id: fujiang" + Environment.NewLine + "  disabled: true" + Environment.NewLine;
-                File.WriteAllText(profilePatch, patchText, new UTF8Encoding(false));
             }
+            if (patchText != originalPatch)
+                File.WriteAllText(profilePatch, patchText, new UTF8Encoding(false));
 
             Console.WriteLine("STEP dependency sync");
             var output = RunCli(cli, dshHome, 300000, "plugin", "--profile", "desktop", "install");
@@ -739,6 +741,16 @@ namespace DSHFujiangInstaller
             }
             File.WriteAllText(profilePatch, string.Join(Environment.NewLine, lines) + Environment.NewLine, new UTF8Encoding(false));
             return backup;
+        }
+
+        // DSH's initial overlay contains comments followed by an empty root list.
+        // Remove only that root node before adding block-list entries; also repair
+        // the same prefix left by older installers, including an existing fujiang row.
+        private static string NormalizeEmptyOverlayRoot(string text)
+        {
+            var root = Regex.Match(text, @"\A(?<leading>(?:(?:[ \t]*\#[^\r\n]*)?[ \t]*(?:\r?\n|\z))*)(?<empty>[ \t]*\[[ \t]*\][ \t]*)(?<comment>\#[^\r\n]*)?(?=\r?\n|\z)");
+            if (!root.Success) return text;
+            return text.Remove(root.Groups["empty"].Index, root.Groups["empty"].Length);
         }
 
         private static string CreateBackup(string dshHome)

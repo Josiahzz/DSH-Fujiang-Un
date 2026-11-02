@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.2.0-1a73e8" alt="version">
+  <img src="https://img.shields.io/badge/version-1.2.1-1a73e8" alt="version">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6" alt="platform">
   <img src="https://img.shields.io/badge/.NET%20Framework-4.8-512BD4" alt="dotnet">
   <img src="https://img.shields.io/badge/arch-AnyCPU-lightgrey" alt="arch">
@@ -14,6 +14,8 @@
 ---
 
 ## 两种安装包
+
+**v1.2.1 修复 Desktop 新装后无法启动的问题**：如果报错指向 `cordis.patch.yml` 中 `[]` 后的 `- id: fujiang`，完全退出 DSH 后重新运行本版 EXE 即可修复，无需删除会话或重装 DSH。手机包保持 v1.2.0。
 
 同一个 [最新 Release](https://github.com/HanKuCha/DSH-Fujiang-Unrestricted/releases/latest) 同时发布：
 

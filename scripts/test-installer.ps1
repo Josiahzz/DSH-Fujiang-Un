@@ -53,6 +53,23 @@ Check ($profile.custom.'中文' -eq '保留' -and $profile.dependencies.keep -eq
 Check ($profile.dsh.profile.bundles -contains '@local/dsh-ws-helper-preset') 'bundle registered'
 Check ([IO.File]::ReadAllBytes($profilePath)[0] -ne 239) 'JSON written without UTF8 BOM'
 Check (![IO.File]::ReadAllText((Join-Path $homePath 'profiles\desktop\cordis.patch.yml')).Contains('[]')) 'empty YAML sequence converted before append'
+$overlayCases = @(
+    @('fresh-comments', "# dsh profile patch`r`n# overrides, disables, and inserts`r`n[]`r`n", "# dsh profile patch`r`n# overrides, disables, and inserts"),
+    @('inline-comment', "# preserved`n[ ] # empty root`n", '# empty root'),
+    @('broken-prefix', "# preserved`r`n[]`r`n`r`n- id: fujiang`r`n  disabled: true`r`n", '# preserved'),
+    @('existing-entries', "# preserve unrelated overrides`r`n- id: keep`r`n  config:`r`n    list: []`r`n", '    list: []')
+)
+foreach ($overlayCase in $overlayCases) {
+    $overlayHome = New-Profile $overlayCase[0]
+    $overlayPath = Join-Path $overlayHome 'profiles\desktop\cordis.patch.yml'
+    [IO.File]::WriteAllText($overlayPath, $overlayCase[1], $utf8)
+    $overlayResult = Install $overlayHome
+    $repaired = [IO.File]::ReadAllText($overlayPath)
+    Check ($repaired.Contains($overlayCase[2])) ("preserve comments or nested lists: " + $overlayCase[0])
+    Check ([IO.File]::ReadAllText((Join-Path $overlayResult.BackupDirectory 'cordis.patch.yml')) -eq $overlayCase[1]) ("backup original overlay: " + $overlayCase[0])
+    Check (@([regex]::Matches($repaired, '(?m)^- id: fujiang\r?$')).Count -eq 1) ("single fujiang override: " + $overlayCase[0])
+    Check ($repaired -notmatch '(?m)^\s*\[\s*\]\s*(#.*)?\r?$') ("no empty root before block entries: " + $overlayCase[0])
+}
 $customSkill = Join-Path $homePath 'plugins\dsh-ws-helper-preset\skills\user-skill\SKILL.md'
 New-Item -ItemType Directory -Force -Path (Split-Path $customSkill) | Out-Null
 [IO.File]::WriteAllText($customSkill, 'user-owned skill', $utf8)
