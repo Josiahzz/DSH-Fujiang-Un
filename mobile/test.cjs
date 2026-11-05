@@ -7,7 +7,7 @@ const read = p => YAML.parseDocument(fs.readFileSync(p, 'utf8'), {logLevel:'sile
 const source = read(path.join(repo, 'payload/dsh-ws-helper-preset/cordis.patch.yml'));
 const mobile = read(path.join(__dirname, 'cordis.patch.yml'));
 assert.equal(mobile.errors.length, 0);
-const find = (doc, id) => doc.getIn([0,'insert',0,'config','plugins'],true).items.find(row=>row.get('id')===id);
+const find = (doc, id) => doc.getIn([0,'insert'],true).items.find(row=>row.getIn(['config','id'])==='ws-helper').getIn(['config','plugins'],true).items.find(row=>row.get('id')===id);
 const sourcePrefix = find(source,'persona').getIn(['config','prefix']);
 const mobilePrefix = find(mobile,'persona').getIn(['config','prefix']);
 assert(mobilePrefix.startsWith(sourcePrefix.replaceAll('本桌面版','本 DSHA 版')));
@@ -24,4 +24,6 @@ assert.equal(count(path.join(repo,'payload/dsh-ws-helper-preset/collaboration-sk
 const manifest=JSON.parse(fs.readFileSync(path.join(repo,'package.json'),'utf8'));
 assert.equal(manifest.dsh.bundle.patch,'./mobile/cordis.patch.yml');
 assert(!manifest.dependencies);
+assert.equal(mobile.getIn([0,'insert'],true).items.length,1,'Desktop host hooks are not shipped to unverified mobile runtimes');
+assert.equal(manifest.exports['./subagent-list-compat'],'./payload/dsh-ws-helper-preset/subagent-list-compat.mjs');
 console.log('MOBILE_SOURCE_PASS: shared persona, portable skill roots, 240+3 skills, DSHA environment, no runtime dependencies');

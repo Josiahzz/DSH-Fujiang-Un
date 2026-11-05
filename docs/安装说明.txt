@@ -1,4 +1,4 @@
-﻿DSH Fujiang Unrestricted v1.2.1
+﻿DSH Fujiang Unrestricted v1.3.0
 
 适用：Windows 10/11，DeepSeek Harness Desktop 0.2.x。
 
@@ -9,7 +9,7 @@
 4. 安装完成并启动 DSH 后，新会话选择“工作助手”。
 
 修复旧安装后的启动错误：
-- 如果错误指向 cordis.patch.yml 中 [] 后的 - id: fujiang，请退出 DSH（包括报错窗口和托盘），重新运行 v1.2.1 安装器。
+- 如果错误指向 cordis.patch.yml 中 [] 后的 - id: fujiang，请退出 DSH（包括报错窗口和托盘），重新运行 v1.3.0 安装器。
 - 本版会备份并修复这类无效空列表前缀，保留其他配置和会话。不需要卸载或重装 DSH。
 
 内容：

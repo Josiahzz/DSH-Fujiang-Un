@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.2.1-1a73e8" alt="version">
+  <img src="https://img.shields.io/badge/version-1.3.0-1a73e8" alt="version">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6" alt="platform">
   <img src="https://img.shields.io/badge/.NET%20Framework-4.8-512BD4" alt="dotnet">
   <img src="https://img.shields.io/badge/arch-AnyCPU-lightgrey" alt="arch">
@@ -14,6 +14,10 @@
 ---
 
 ## 两种安装包
+
+**v1.3.0 已验证 DSH Desktop 0.2.2-rc.1**，修复 `tool-subagent-list-agents ... never started` 导致工作助手无法加载、新建会话失败。Windows 安装包已包含 .coop.7 的补回应与过程清单同步模块。
+
+新版安装器保留现有本地维护目录的链接并拒绝预设降级。请重新下载本 Release 的 EXE；已下载的 v1.2.x 旧安装器不会自动获得这项保护，仍可能把本地维护版切回旧包。
 
 **v1.2.1 修复 Desktop 新装后无法启动的问题**：如果报错指向 `cordis.patch.yml` 中 `[]` 后的 `- id: fujiang`，完全退出 DSH 后重新运行本版 EXE 即可修复，无需删除会话或重装 DSH。手机包保持 v1.2.0。
 

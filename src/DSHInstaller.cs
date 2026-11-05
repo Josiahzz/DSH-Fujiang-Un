@@ -14,8 +14,8 @@ using System.Collections;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-[assembly: System.Reflection.AssemblyVersion("1.2.1.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.2.1.0")]
+[assembly: System.Reflection.AssemblyVersion("1.3.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.3.0.0")]
 [assembly: System.Reflection.AssemblyProduct("DSH Fujiang Unrestricted")]
 
 namespace DSHFujiangInstaller
@@ -24,7 +24,7 @@ namespace DSHFujiangInstaller
     {
         private const string ProductName = "DSH Fujiang Unrestricted";
         private const string PackageName = "@local/dsh-ws-helper-preset";
-        private const string ExpectedPresetSha256 = "362CA8D9432F0EDD40DA52909236811BCBA99F3C945485B28236D0E171D3B2D9";
+        private const string ExpectedPresetSha256 = "6B3EF552112AE3511E94905C6C295F8ACF0DE1177579D6A5FDC09B9984C8D87E";
 
         [STAThread]
         private static void Main(string[] args)
@@ -665,10 +665,11 @@ namespace DSHFujiangInstaller
             var checkedProfile = ReadJson(profilePackage);
             GetDependencies(checkedProfile);
             GetBundles(checkedProfile);
+            var targetPlugin = ResolvePluginTarget(checkedProfile, profileRoot, dshHome);
+            RejectPresetDowngrade(packageSource, Path.Combine(targetPlugin, "package.json"));
             Console.WriteLine("STEP backup profile");
             var backup = CreateBackup(dshHome);
             Console.WriteLine("BACKUP=" + backup);
-            var targetPlugin = Path.Combine(dshHome, "plugins", "dsh-ws-helper-preset");
             Directory.CreateDirectory(Path.Combine(dshHome, "plugins"));
             if (Directory.Exists(targetPlugin))
             {
@@ -702,6 +703,16 @@ namespace DSHFujiangInstaller
             var installedPreset = Path.Combine(profileRoot, "node_modules", "@local", "dsh-ws-helper-preset", "cordis.patch.yml");
             if (!File.Exists(installedPreset) || !string.Equals(HashFile(installedPreset), Program.ExpectedHash, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("依赖同步后未找到正确的预设链接，安装未完成。备份：" + backup);
+            var installedRoot = Path.GetDirectoryName(installedPreset);
+            var bundledVersion = Convert.ToString(ReadJson(packageSource)["version"]);
+            if (Convert.ToString(ReadJson(Path.Combine(installedRoot, "package.json"))["version"]) != bundledVersion)
+                throw new InvalidOperationException("实际链接的预设版本与安装包不一致。备份：" + backup);
+            foreach (var module in Directory.GetFiles(Path.GetDirectoryName(packageSource), "*.mjs"))
+            {
+                var installedModule = Path.Combine(installedRoot, Path.GetFileName(module));
+                if (!File.Exists(installedModule) || HashFile(installedModule) != HashFile(module))
+                    throw new InvalidOperationException("实际链接的运行时模块不一致：" + Path.GetFileName(module) + "。备份：" + backup);
+            }
             Console.WriteLine("STEP verified installed preset");
 
             return new InstallResult
@@ -751,6 +762,44 @@ namespace DSHFujiangInstaller
             var root = Regex.Match(text, @"\A(?<leading>(?:(?:[ \t]*\#[^\r\n]*)?[ \t]*(?:\r?\n|\z))*)(?<empty>[ \t]*\[[ \t]*\][ \t]*)(?<comment>\#[^\r\n]*)?(?=\r?\n|\z)");
             if (!root.Success) return text;
             return text.Remove(root.Groups["empty"].Index, root.Groups["empty"].Length);
+        }
+
+        private static string ResolvePluginTarget(Dictionary<string, object> profile, string profileRoot, string dshHome)
+        {
+            object dependency;
+            if (GetDependencies(profile).TryGetValue(Program.PackageId, out dependency))
+            {
+                var link = dependency as string;
+                if (link != null && link.StartsWith("link:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var target = Path.GetFullPath(Path.Combine(profileRoot, link.Substring(5)));
+                    var homePrefix = Path.GetFullPath(dshHome).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                    var manifest = Path.Combine(target, "package.json");
+                    if (!target.StartsWith(homePrefix, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException("现有预设链接位于所选 DSH_HOME 之外，请先核实该自定义位置，安装器不会替换它。");
+                    if (File.Exists(manifest) && Convert.ToString(ReadJson(manifest)["name"]) == Program.PackageId) return target;
+                    throw new InvalidOperationException("现有预设链接缺失或不是工作助手，请先检查：" + target);
+                }
+            }
+            return Path.Combine(dshHome, "plugins", "dsh-ws-helper-preset");
+        }
+
+        private static void RejectPresetDowngrade(string bundledManifest, string installedManifest)
+        {
+            if (!File.Exists(installedManifest)) return;
+            var bundled = Convert.ToString(ReadJson(bundledManifest)["version"]);
+            var installed = Convert.ToString(ReadJson(installedManifest)["version"]);
+            var pattern = @"^(\d+)\.(\d+)\.(\d+)(?:-desktop-coop\.(\d+))?";
+            var source = Regex.Match(bundled, pattern);
+            var current = Regex.Match(installed, pattern);
+            if (!source.Success || !current.Success) throw new InvalidDataException("无法比较预设版本，安装未执行。");
+            for (int i = 1; i <= 4; i++)
+            {
+                var a = source.Groups[i].Success ? int.Parse(source.Groups[i].Value) : 0;
+                var b = current.Groups[i].Success ? int.Parse(current.Groups[i].Value) : 0;
+                if (a > b) return;
+                if (a < b) throw new InvalidOperationException("拒绝降级工作助手：本机 " + installed + " 比安装包 " + bundled + " 更新。");
+            }
         }
 
         private static string CreateBackup(string dshHome)

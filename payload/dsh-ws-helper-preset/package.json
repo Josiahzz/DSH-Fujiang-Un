@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-ws-helper-preset",
-  "version": "2.1.3-desktop-coop.1",
+  "version": "2.1.3-desktop-coop.7",
   "private": true,
   "type": "module",
   "description": "工作助手 Desktop 协作版：保留原有角色，补充澄清、进度沟通、目标纠正、排查验收及后台终端。",
@@ -8,5 +8,11 @@
     "bundle": {
       "patch": "./cordis.patch.yml"
     }
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    "./communication": "./communication.mjs",
+    "./todo-reconcile": "./todo-reconcile.mjs",
+    "./subagent-list-compat": "./subagent-list-compat.mjs"
   }
 }

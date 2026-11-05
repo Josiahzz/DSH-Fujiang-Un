@@ -33,13 +33,23 @@ function Install($homePath) {
     return $run.Invoke($null, @([string]$stage, [string]$exe, [string]$homePath))
 }
 # Simulate the CLI's package link creation, without installing the application.
+$linker = Join-Path $root 'mock-linker.ps1'
+$linkScript = @'
+$ErrorActionPreference='Stop'
+$p=Get-Content -LiteralPath (Join-Path $env:DSH_HOME 'profiles\desktop\package.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$target=$p.dependencies.'@local/dsh-ws-helper-preset'.Substring(5)
+$link=Join-Path $env:DSH_HOME 'profiles\desktop\node_modules\@local\dsh-ws-helper-preset'
+New-Item -ItemType Directory -Force -Path (Split-Path $link) | Out-Null
+if (!(Test-Path -LiteralPath $link)) { New-Item -ItemType Junction -Path $link -Target $target | Out-Null }
+'@
+[IO.File]::WriteAllText($linker,$linkScript,$utf8)
+$env:DSH_TEST_LINKER=$linker
 $success = @'
 @echo off
 setlocal DisableDelayedExpansion
 if not "%1 %2 %3 %4"=="plugin --profile desktop install" exit /b 19
-if not exist "%DSH_HOME%\profiles\desktop\node_modules\@local" mkdir "%DSH_HOME%\profiles\desktop\node_modules\@local"
-if not exist "%DSH_HOME%\profiles\desktop\node_modules\@local\dsh-ws-helper-preset" mklink /J "%DSH_HOME%\profiles\desktop\node_modules\@local\dsh-ws-helper-preset" "%DSH_HOME%\plugins\dsh-ws-helper-preset"
-exit /b 0
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%DSH_TEST_LINKER%"
+exit /b %errorlevel%
 '@
 [IO.File]::WriteAllText($cli, $success, [Text.Encoding]::ASCII)
 $homePath = New-Profile '用户 中文 & %TEMP% (1)'
@@ -88,6 +98,32 @@ foreach ($file in Get-ChildItem -LiteralPath $payload -File -Recurse) {
     if ((Get-FileHash -LiteralPath $file.FullName).Hash -ne (Get-FileHash -LiteralPath $dest).Hash) { $mismatches += $rel }
 }
 Check ($mismatches.Count -eq 0) 'all copied payload files match hashes'
+# Existing local maintenance paths must stay selected during upgrades.
+$localHome = New-Profile 'existing-local'
+$localPlugin = Join-Path $localHome 'profiles\desktop\local-plugins\dsh-ws-helper-preset'
+New-Item -ItemType Directory -Force -Path $localPlugin | Out-Null
+Copy-Item -Path (Join-Path $stage 'payload\dsh-ws-helper-preset\*') -Destination $localPlugin -Recurse
+$localManifest = Join-Path $localPlugin 'package.json'
+$meta = Get-Content -LiteralPath $localManifest -Raw -Encoding UTF8 | ConvertFrom-Json
+$meta.version='2.1.3-desktop-coop.6'
+[IO.File]::WriteAllText($localManifest,($meta | ConvertTo-Json -Depth 20),$utf8)
+$localProfile = Join-Path $localHome 'profiles\desktop\package.json'
+$meta = Get-Content -LiteralPath $localProfile -Raw -Encoding UTF8 | ConvertFrom-Json
+$meta.dependencies | Add-Member -NotePropertyName '@local/dsh-ws-helper-preset' -NotePropertyValue ('link:'+$localPlugin.Replace('\','/'))
+[IO.File]::WriteAllText($localProfile,($meta | ConvertTo-Json -Depth 20),$utf8)
+$null = Install $localHome
+$meta = Get-Content -LiteralPath $localProfile -Raw -Encoding UTF8 | ConvertFrom-Json
+Check ($meta.dependencies.'@local/dsh-ws-helper-preset' -eq ('link:'+$localPlugin.Replace('\','/'))) 'upgrade preserves existing local maintenance link'
+Check ((Get-Content -LiteralPath $localManifest -Raw -Encoding UTF8 | ConvertFrom-Json).version -eq '2.1.3-desktop-coop.7') 'existing local maintenance copy upgraded to current payload'
+Check (!(Test-Path -LiteralPath (Join-Path $localHome 'plugins\dsh-ws-helper-preset'))) 'no duplicate shared preset created for existing local link'
+$meta = Get-Content -LiteralPath $localManifest -Raw -Encoding UTF8 | ConvertFrom-Json
+$meta.version='2.1.3-desktop-coop.8'
+[IO.File]::WriteAllText($localManifest,($meta | ConvertTo-Json -Depth 20),$utf8)
+$beforeVersionHash=(Get-FileHash -LiteralPath $localManifest).Hash
+$rejected=$false
+try { $null = Install $localHome } catch { $rejected=$_.Exception.ToString().Contains('拒绝降级') }
+Check $rejected 'reject downgrade of newer local preset'
+Check ((Get-FileHash -LiteralPath $localManifest).Hash -eq $beforeVersionHash) 'downgrade rejection leaves newer preset unchanged'
 # Failures must propagate rather than report successful installation.
 foreach ($case in @(@('failure', "@echo off`r`necho fixture-sync-failed`r`nexit /b 37`r`n", '37'), @('missing-link', "@echo off`r`nexit /b 0`r`n", '预设链接'))) {
     [IO.File]::WriteAllText($cli, $case[1], [Text.Encoding]::ASCII)

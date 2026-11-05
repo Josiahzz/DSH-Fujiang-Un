@@ -26,7 +26,7 @@ Adds clarification, progress updates, latest-goal handling, DSH tool and subagen
 
 ## DSHA for Android
 
-The same release includes `DSH-Fujiang-DSHA-v1.2.0.zip`. Import that ZIP in DSHA Plugins, or paste its exact asset URL. No Windows installer files are included. Both adapters are generated from the shared preset and skills; see [mobile instructions](mobile/README.md) for verification limits.
+The same release includes `DSH-Fujiang-DSHA-v1.3.0.zip`. Import that ZIP in DSHA Plugins, or paste its exact asset URL. No Windows installer files are included. Both adapters share the preset and skills. Desktop-only reply and todo host hooks are excluded from the mobile composition; see [mobile instructions](mobile/README.md) for verification limits.
 
 ## Requirements
 
